@@ -1,16 +1,37 @@
 import textwrap
 
 from django.conf import settings
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice
+from django.utils.timezone import localtime
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, ReplyKeyboardMarkup
 from telegram.ext import ContextTypes
 
 from . import start_tg_bot
-from backend.models import User, Subscription
+from backend.models import User, Subscription, Tariff
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, user) -> int:
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
-        user = await User.objects.aget(id=user.id)
+        user = await User.objects.aget(telegram_id=update.message.from_user.id)
+        subscription = await user.subscriptions.select_related('tariff').afirst()
+        reply_text = textwrap.dedent(f'''
+                Здравствуйте, {user.name}.\n
+                Ваша подписка: {subscription.tariff.title}.
+                Осталось запросов: {subscription.tariff.max_month_requests - subscription.sent_requests}.
+                Максимальное время ответа на запрос: {subscription.tariff.max_response_time}ч.
+                Подписка продлится: {31 - (subscription.created_at - localtime()).days}д.
+                ''')
+        reply_keyboard = [['Сделать запрос'], ['Мои запросы']]
+        await update.effective_chat.send_message(
+            reply_text,
+            reply_markup=ReplyKeyboardMarkup(
+                reply_keyboard,
+                one_time_keyboard=True,
+                input_field_placeholder="Сделать новый запрос или посмотреть существующие?"
+            ),
+        )
+
+        return start_tg_bot.HANDLE_EMPLOYER_MENU
+
     except User.DoesNotExist:
         reply_text = textwrap.dedent('''
         Извините, но мы не смогли найти вас у себя.\n\n
@@ -20,17 +41,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, user) -> int
 
         reply_markup = []
 
-        async for subscription in Subscription.objects.all():
+        async for tariff in Tariff.objects.all():
             reply_text += textwrap.dedent(f'''
-            {subscription.title} - {subscription.price}₽ в месяц \n
-            Максимум заявок в месяц: {subscription.max_month_requests}
-            Максимальное время рассмотра заявки: {subscription.max_response_time}ч.\n
+            {tariff.title} - {tariff.price}₽ в месяц \n
+            Максимум заявок в месяц: {tariff.max_month_requests}
+            Максимальное время рассмотра заявки: {tariff.max_response_time}ч.\n
             ''')
-            if subscription.extra:
-                reply_text += f"Дополнительно: {subscription.extra}\n\n"
+            if tariff.extra:
+                reply_text += f"Дополнительно: {tariff.extra}\n\n"
 
             reply_markup.append(
-                [InlineKeyboardButton(subscription.title, callback_data=subscription.id)]
+                [InlineKeyboardButton(tariff.title, callback_data=tariff.id)]
             )
 
         reply_markup.append(
@@ -53,6 +74,23 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.answer(ok=True)
 
 
-async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.message.reply_text("Спасибо за покупку! Теперь вам доступны возможности заказчика.")
-    return
+async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    tg_user = update.message.from_user
+    tariff = await Tariff.objects.aget(id=context.user_data["tariff_id"])
+    user = await User.objects.acreate(
+        telegram_id=tg_user.id,
+        name=tg_user.first_name,
+        type="employer",
+    )
+    subscription = await Subscription.objects.acreate(user=user, tariff=tariff)
+    await update.message.reply_text(
+        f"Спасибо за покупку! {user.name}, теперь вам доступны возможности подписки {subscription.tariff.title}."
+    )
+    return await start(update, context)
+
+
+def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.message.text == "Сделать новый запрос":
+        pass
+    elif update.message.text == "Мои запросы":
+        pass
