@@ -11,7 +11,7 @@ class Subscription(models.Model):
     price = models.PositiveSmallIntegerField('Цена')
     max_month_requests = models.PositiveSmallIntegerField('Максимум заявок в месяц')
     max_response_time = models.PositiveSmallIntegerField('Время рассмотрения заявки(в часах)')
-    extra = models.CharField('Дополнительные возможности', max_length=350)
+    extra = models.CharField('Дополнительные возможности', blank=True, max_length=350)
 
     class Meta:
         verbose_name = 'Подписка'
