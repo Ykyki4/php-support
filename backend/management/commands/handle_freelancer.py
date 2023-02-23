@@ -16,10 +16,4 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE, user) -> int
                 [InlineKeyboardButton("Назад", callback_data="back")],
             ])
         )
-        return start_tg_bot.HANDLE_FREELANCER_MENU
-
-
-async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if update.callback_query.data == 'back':
-        await update.callback_query.message.delete()
-        return await start_tg_bot.start(update, context)
+        return start_tg_bot.HANDLE_USER_NOT_FOUND

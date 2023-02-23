@@ -128,3 +128,5 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 TG_BOT_TOKEN = env('TG_BOT_TOKEN', None)
+
+TG_PAYMENT_PROVIDER_TOKEN = env('TG_PAYMENT_PROVIDER_TOKEN', None)

@@ -2,20 +2,21 @@ import logging
 
 from django.conf import settings
 from django.core.management import BaseCommand
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, InlineKeyboardMarkup, InlineKeyboardButton, \
+    LabeledPrice
 from telegram.ext import (
     Application,
     CommandHandler,
     ContextTypes,
     ConversationHandler,
     MessageHandler,
-    filters, CallbackQueryHandler,
+    filters, CallbackQueryHandler, PreCheckoutQueryHandler,
 )
 
 from . import handle_freelancer, handle_employer
-from ...models import User
+from ...models import Subscription
 
-USER_TYPE, HANDLE_EMPLOYER_MENU, HANDLE_FREELANCER_MENU = range(3)
+USER_TYPE, HANDLE_USER_NOT_FOUND, WAIT_PAYMENT = range(3)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -41,6 +42,28 @@ async def user_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return await handle_freelancer.start(update, context, user)
 
 
+async def handle_user_not_found(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.callback_query.data == 'back':
+        await update.callback_query.message.delete()
+        return await start(update, context)
+    else:
+        subscription = await Subscription.objects.aget(id=update.callback_query.data)
+
+        description = f"Покупка подписки {subscription.title} на месяц."
+
+        payload = "Subscription-Payload"
+
+        currency = "RUB"
+
+        prices = [LabeledPrice("Test", subscription.price * 100)]
+
+        await update.effective_chat.send_invoice(
+            subscription.title, description, payload, settings.TG_PAYMENT_PROVIDER_TOKEN, currency, prices
+        )
+
+        return WAIT_PAYMENT
+
+
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
         "Пока-пока!", reply_markup=ReplyKeyboardRemove()
@@ -63,13 +86,17 @@ class Command(BaseCommand):
             entry_points=[CommandHandler("start", start)],
             states={
                 USER_TYPE: [MessageHandler(filters.Regex("^(Заказчик|Фрилансер)$"), user_type)],
-                HANDLE_EMPLOYER_MENU: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_employer.handle_menu)],
-                HANDLE_FREELANCER_MENU: [
-                    CallbackQueryHandler(handle_freelancer.handle_menu),
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_freelancer.handle_menu)
+                HANDLE_USER_NOT_FOUND: [
+                    CallbackQueryHandler(handle_user_not_found),
+                    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_not_found)
                 ],
+                WAIT_PAYMENT: [
+                    PreCheckoutQueryHandler(handle_employer.precheckout_callback),
+                    MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_employer.successful_payment_callback)
+                ]
             },
             fallbacks=[CommandHandler("cancel", cancel)],
+            per_chat=False,
         )
 
         application.add_handler(conv_handler)
