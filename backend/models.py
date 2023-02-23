@@ -22,7 +22,7 @@ class Tariff(models.Model):
 
 
 class User(models.Model):
-    telegram_id = models.CharField('Телеграм идентификатор', max_length=50)
+    telegram_id = models.CharField('Телеграм идентификатор', unique=True, max_length=50)
     name = models.CharField('Имя', max_length=50, null=True)
     type = models.CharField('Тип пользователя', choices=USER_TYPE_CHOICES, max_length=20)
 
