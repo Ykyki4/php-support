@@ -49,6 +49,7 @@ class Subscription(models.Model):
     )
     sent_requests = models.PositiveSmallIntegerField(
         verbose_name='Количество заявок',
+        default=0,
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создано')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Обновлено')
