@@ -1,10 +1,15 @@
 from django.contrib import admin
 
-from .models import User, Subscription
+from .models import User, Subscription, Tariff
 
 
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(Tariff)
+class TariffAdmin(admin.ModelAdmin):
     pass
 
 
@@ -18,5 +23,3 @@ class UserAdmin(admin.ModelAdmin):
                 return 'telegram_id', 'name', 'type',
         else:
             return 'telegram_id', 'name', 'type',
-
-

@@ -6,7 +6,7 @@ USER_TYPE_CHOICES = [
 ]
 
 
-class Subscription(models.Model):
+class Tariff(models.Model):
     title = models.CharField('Название', max_length=50)
     price = models.PositiveSmallIntegerField('Цена')
     max_month_requests = models.PositiveSmallIntegerField('Максимум заявок в месяц')
@@ -14,8 +14,8 @@ class Subscription(models.Model):
     extra = models.CharField('Дополнительные возможности', blank=True, max_length=350)
 
     class Meta:
-        verbose_name = 'Подписка'
-        verbose_name_plural = 'Подписки'
+        verbose_name = 'Тариф'
+        verbose_name_plural = 'Тарифы'
 
     def __str__(self):
         return self.title
@@ -25,14 +25,6 @@ class User(models.Model):
     telegram_id = models.CharField('Телеграм идентификатор', max_length=50)
     name = models.CharField('Имя', max_length=50, null=True)
     type = models.CharField('Тип пользователя', choices=USER_TYPE_CHOICES, max_length=20)
-    subscription = models.ForeignKey(
-        Subscription,
-        on_delete=models.CASCADE,
-        verbose_name='Подписка',
-        related_name='users',
-        blank=True,
-        null=True
-    )
 
     class Meta:
         verbose_name = 'Пользователь'
@@ -40,3 +32,53 @@ class User(models.Model):
 
     def __str__(self):
         return f"{self.name} - {self.get_type_display()}"
+
+
+class Subscription(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        verbose_name='Пользователь',
+        related_name='subscriptions'
+    )
+    tariff = models.ForeignKey(
+        Tariff,
+        on_delete=models.CASCADE,
+        verbose_name='Тариф',
+        related_name='subscriptions',
+    )
+    sent_requests = models.PositiveSmallIntegerField(
+        verbose_name='Количество заявок',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создано')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Обновлено')
+
+    class Meta:
+        verbose_name = 'Подписка'
+        verbose_name_plural = 'Подписки'
+
+    def __str__(self):
+        return f'Подписка пользователя {self.user.name}'
+
+
+class Request(models.Model):
+    customer = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        verbose_name='Заказчик',
+        related_name='requests'
+    ),
+    worker = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        verbose_name='Исполнитель',
+        related_name='requests',
+        null=True,
+        blank=True
+    )
+    description = models.TextField(
+        verbose_name='Описание заказа'
+    )
+
+    def __str__(self):
+        return f'Запрос #{self.id} от {self.customer.name}'
