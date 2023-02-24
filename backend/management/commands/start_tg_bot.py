@@ -16,7 +16,8 @@ from telegram.ext import (
 from . import handle_freelancer, handle_employer
 from backend.models import Subscription, Tariff
 
-USER_TYPE, HANDLE_USER_NOT_FOUND, WAIT_PAYMENT, HANDLE_EMPLOYER_MENU, HANDLE_MAKE_REQUEST = range(5)
+USER_TYPE, HANDLE_USER_NOT_FOUND, WAIT_PAYMENT, HANDLE_EMPLOYER_MENU, \
+    HANDLE_MAKE_REQUEST, HANDLE_SHOW_ALL_EMPLOYER_REQUESTS = range(6)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -103,6 +104,9 @@ class Command(BaseCommand):
                 HANDLE_MAKE_REQUEST: [
                     CallbackQueryHandler(handle_employer.handle_make_request),
                     MessageHandler(filters.TEXT, handle_employer.handle_make_request),
+                ],
+                HANDLE_SHOW_ALL_EMPLOYER_REQUESTS: [
+                    CallbackQueryHandler(handle_employer.handle_show_all_requests)
                 ]
             },
             fallbacks=[CommandHandler("cancel", cancel)],
