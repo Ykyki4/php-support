@@ -99,7 +99,7 @@ class Command(BaseCommand):
                     MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_employer.successful_payment_callback)
                 ],
                 HANDLE_EMPLOYER_MENU: [
-                    MessageHandler(filters.TEXT, handle_employer.handle_menu),
+                    CallbackQueryHandler(handle_employer.handle_menu),
                 ],
                 HANDLE_MAKE_REQUEST: [
                     CallbackQueryHandler(handle_employer.handle_make_request),
