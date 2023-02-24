@@ -6,12 +6,12 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, Labeled
 from telegram.ext import ContextTypes
 
 from . import start_tg_bot
-from backend.models import User, Subscription, Tariff, Request
+from backend.models import Subscription, Tariff, Request, Customer
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
-        user = await User.objects.aget(telegram_id=update.effective_user.id)
+        user = await Customer.objects.aget(telegram_id=update.effective_user.id)
         subscription = await user.subscriptions.select_related('tariff').afirst()
 
         reply_text = textwrap.dedent(f'''
@@ -35,7 +35,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
         return start_tg_bot.HANDLE_EMPLOYER_MENU
 
-    except User.DoesNotExist:
+    except Customer.DoesNotExist:
         reply_text = textwrap.dedent('''
         Извините, но мы не смогли найти вас у себя.\n\n
         Чтобы стать заказчиком, вам нужно оформить подписку.
@@ -79,10 +79,9 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     tg_user = update.message.from_user
-    user = await User.objects.acreate(
+    user = await Customer.objects.acreate(
         telegram_id=tg_user.id,
         name=tg_user.first_name,
-        type="employer",
     )
     subscription = await Subscription.objects.acreate(user=user, tariff=context.user_data['tariff'])
     await update.message.reply_text(
@@ -96,7 +95,7 @@ async def handle_make_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.callback_query.message.delete()
         return await start(update, context)
     else:
-        user = await User.objects.aget(telegram_id=update.message.from_user.id)
+        user = await Customer.objects.aget(telegram_id=update.message.from_user.id)
         await Request.objects.acreate(customer=user, description=update.message.text)
         tariff = context.user_data["tariff"]
         await update.message.reply_text(
