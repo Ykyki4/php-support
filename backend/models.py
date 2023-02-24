@@ -34,9 +34,21 @@ class User(models.Model):
         return f"{self.name} - {self.get_type_display()}"
 
 
+class Customer(User):
+    class Meta:
+        verbose_name = 'Заказчик'
+        verbose_name_plural = 'Заказчики'
+
+
+class Worker(User):
+    class Meta:
+        verbose_name = 'Исполнитель'
+        verbose_name_plural = 'Исполнители'
+
+
 class Subscription(models.Model):
     user = models.ForeignKey(
-        User,
+        Customer,
         on_delete=models.CASCADE,
         verbose_name='Пользователь',
         related_name='subscriptions'
@@ -53,6 +65,9 @@ class Subscription(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создано')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Обновлено')
 
+    def has_max_requests(self):
+        return self.sent_requests == self.tariff.max_month_requests
+
     class Meta:
         verbose_name = 'Подписка'
         verbose_name_plural = 'Подписки'
@@ -63,13 +78,13 @@ class Subscription(models.Model):
 
 class Request(models.Model):
     customer = models.ForeignKey(
-        User,
+        Customer,
         on_delete=models.CASCADE,
         verbose_name='Заказчик',
         related_name='requests'
-    ),
+    )
     worker = models.ForeignKey(
-        User,
+        Worker,
         on_delete=models.SET_NULL,
         verbose_name='Исполнитель',
         related_name='requests',
