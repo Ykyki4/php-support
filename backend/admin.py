@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import User, Subscription, Tariff
+from .models import User, Worker, Customer, Subscription, Tariff, Request
 
 
 @admin.register(Subscription)
@@ -15,4 +15,19 @@ class TariffAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(Customer)
+class CustomerAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(Worker)
+class WorkerAdmin(admin.ModelAdmin):
+    pass
+
+
+@admin.register(Request)
+class RequestAdmin(admin.ModelAdmin):
     pass
