@@ -22,14 +22,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 Подписка продлится: {31 - (localtime() - subscription.created_at).days}д.
                 ''')
 
-        reply_keyboard = [['Сделать новый запрос'], ['Мои запросы']]
+        reply_keyboard = [[InlineKeyboardButton('Мои запросы', callback_data="all_requests")]]
+
+        if subscription.has_max_requests():
+            reply_text += "Извините, вы достигли максимального количества заявок в месяц по вашей подписке."
+        else:
+            reply_keyboard.append([InlineKeyboardButton('Сделать новый запрос', callback_data="new_request")])
 
         await update.effective_chat.send_message(
             reply_text,
-            reply_markup=ReplyKeyboardMarkup(
-                reply_keyboard,
-                one_time_keyboard=True,
-                input_field_placeholder="Сделать новый запрос или посмотреть существующие?"
+            reply_markup=InlineKeyboardMarkup(
+                reply_keyboard
             ),
         )
 
@@ -116,17 +119,10 @@ async def handle_show_all_requests(update: Update, context: ContextTypes.DEFAULT
 
 
 async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if update.message.text == "Сделать новый запрос":
-        user = await Customer.objects.aget(telegram_id=update.effective_user.id)
-        subscription = await user.subscriptions.select_related('tariff').afirst()
-
-        if subscription.sent_requests == subscription.tariff.max_month_requests:
-            await update.effective_chat.send_message(
-                "Извините, но вы достигли максимального количества заявок в месяц по вашей подписке."
-            )
-            return await start(update, context)
-
-        await update.message.reply_text(
+    print(update.callback_query.data)
+    if update.callback_query.data == 'new_request':
+        await update.callback_query.message.delete()
+        await update.effective_chat.send_message(
             f"Для того чтобы сделать новый запрос, просто напишите текстовую информацию о нём боту, одним сообщением.",
             reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("Назад", callback_data="back")]
@@ -134,10 +130,11 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             )
 
         return start_tg_bot.HANDLE_MAKE_REQUEST
-    elif update.message.text == "Мои запросы":
+
+    elif update.callback_query.data == 'all_requests':
         reply_text = "Ваши запросы:\n"
 
-        user = await Customer.objects.aget(telegram_id=update.message.from_user.id)
+        user = await Customer.objects.aget(telegram_id=update.effective_user.id)
         async for request in user.requests.all():
             reply_text += textwrap.dedent(f'''
             {request}
@@ -145,7 +142,8 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
             Статус запроса: Статус
             ''')
 
-        await update.message.reply_text(
+        await update.callback_query.message.delete()
+        await update.effective_chat.send_message(
             reply_text,
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("Назад", callback_data="back")]
