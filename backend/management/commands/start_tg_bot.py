@@ -14,9 +14,9 @@ from telegram.ext import (
 )
 
 from . import handle_freelancer, handle_employer
-from ...models import Subscription
+from backend.models import Subscription, Tariff
 
-USER_TYPE, HANDLE_USER_NOT_FOUND, WAIT_PAYMENT = range(3)
+USER_TYPE, HANDLE_USER_NOT_FOUND, WAIT_PAYMENT, HANDLE_EMPLOYER_MENU, HANDLE_MAKE_REQUEST = range(5)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -37,7 +37,7 @@ async def user_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.message.from_user
 
     if update.message.text == "Заказчик":
-        return await handle_employer.start(update, context, user)
+        return await handle_employer.start(update, context)
     elif update.message.text == "Фрилансер":
         return await handle_freelancer.start(update, context, user)
 
@@ -47,18 +47,19 @@ async def handle_user_not_found(update: Update, context: ContextTypes.DEFAULT_TY
         await update.callback_query.message.delete()
         return await start(update, context)
     else:
-        subscription = await Subscription.objects.aget(id=update.callback_query.data)
+        tariff = await Tariff.objects.aget(id=update.callback_query.data)
+        context.user_data['tariff'] = tariff
 
-        description = f"Покупка подписки {subscription.title} на месяц."
+        description = f"Покупка подписки {tariff.title} на месяц."
 
         payload = "Subscription-Payload"
 
         currency = "RUB"
 
-        prices = [LabeledPrice("Test", subscription.price * 100)]
+        prices = [LabeledPrice("Test", tariff.price * 100)]
 
         await update.effective_chat.send_invoice(
-            subscription.title, description, payload, settings.TG_PAYMENT_PROVIDER_TOKEN, currency, prices
+            tariff.title, description, payload, settings.TG_PAYMENT_PROVIDER_TOKEN, currency, prices
         )
 
         return WAIT_PAYMENT
@@ -85,14 +86,23 @@ class Command(BaseCommand):
         conv_handler = ConversationHandler(
             entry_points=[CommandHandler("start", start)],
             states={
-                USER_TYPE: [MessageHandler(filters.Regex("^(Заказчик|Фрилансер)$"), user_type)],
+                USER_TYPE: [
+                    MessageHandler(filters.Regex("^(Заказчик|Фрилансер)$"), user_type)
+                ],
                 HANDLE_USER_NOT_FOUND: [
                     CallbackQueryHandler(handle_user_not_found),
-                    MessageHandler(filters.TEXT & ~filters.COMMAND, handle_user_not_found)
+                    MessageHandler(filters.TEXT, handle_user_not_found)
                 ],
                 WAIT_PAYMENT: [
                     PreCheckoutQueryHandler(handle_employer.precheckout_callback),
                     MessageHandler(filters.SUCCESSFUL_PAYMENT, handle_employer.successful_payment_callback)
+                ],
+                HANDLE_EMPLOYER_MENU: [
+                    MessageHandler(filters.TEXT, handle_employer.handle_menu),
+                ],
+                HANDLE_MAKE_REQUEST: [
+                    CallbackQueryHandler(handle_employer.handle_make_request),
+                    MessageHandler(filters.TEXT, handle_employer.handle_make_request),
                 ]
             },
             fallbacks=[CommandHandler("cancel", cancel)],

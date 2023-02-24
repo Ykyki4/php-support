@@ -22,7 +22,7 @@ class Tariff(models.Model):
 
 
 class User(models.Model):
-    telegram_id = models.CharField('Телеграм идентификатор', max_length=50)
+    telegram_id = models.CharField('Телеграм идентификатор', unique=True, max_length=50)
     name = models.CharField('Имя', max_length=50, null=True)
     type = models.CharField('Тип пользователя', choices=USER_TYPE_CHOICES, max_length=20)
 
@@ -61,6 +61,7 @@ class Subscription(models.Model):
     )
     sent_requests = models.PositiveSmallIntegerField(
         verbose_name='Количество заявок',
+        default=0,
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создано')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Обновлено')
