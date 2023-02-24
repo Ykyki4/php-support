@@ -1,10 +1,5 @@
 from django.db import models
 
-USER_TYPE_CHOICES = [
-    ('employer', 'Заказчик'),
-    ('freelancer', 'Фрилансер')
-]
-
 
 class Tariff(models.Model):
     title = models.CharField('Название', max_length=50)
@@ -24,7 +19,6 @@ class Tariff(models.Model):
 class User(models.Model):
     telegram_id = models.CharField('Телеграм идентификатор', unique=True, max_length=50)
     name = models.CharField('Имя', max_length=50, null=True)
-    type = models.CharField('Тип пользователя', choices=USER_TYPE_CHOICES, max_length=20)
 
     class Meta:
         verbose_name = 'Пользователь'
