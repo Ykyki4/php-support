@@ -14,9 +14,9 @@ from telegram.ext import (
 )
 
 from . import handle_freelancer, handle_employer
-from ...models import Subscription, Tariff
+from backend.models import Subscription, Tariff
 
-USER_TYPE, HANDLE_USER_NOT_FOUND, WAIT_PAYMENT, HANDLE_EMPLOYER_MENU = range(4)
+USER_TYPE, HANDLE_USER_NOT_FOUND, WAIT_PAYMENT, HANDLE_EMPLOYER_MENU, HANDLE_MAKE_REQUEST = range(5)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -48,7 +48,7 @@ async def handle_user_not_found(update: Update, context: ContextTypes.DEFAULT_TY
         return await start(update, context)
     else:
         tariff = await Tariff.objects.aget(id=update.callback_query.data)
-        context.user_data['tariff_id'] = tariff.id
+        context.user_data['tariff'] = tariff
 
         description = f"Покупка подписки {tariff.title} на месяц."
 
@@ -100,6 +100,10 @@ class Command(BaseCommand):
                 HANDLE_EMPLOYER_MENU: [
                     MessageHandler(filters.TEXT, handle_employer.handle_menu),
                 ],
+                HANDLE_MAKE_REQUEST: [
+                    CallbackQueryHandler(handle_employer.handle_make_request),
+                    MessageHandler(filters.TEXT, handle_employer.handle_make_request),
+                ]
             },
             fallbacks=[CommandHandler("cancel", cancel)],
             per_chat=False,

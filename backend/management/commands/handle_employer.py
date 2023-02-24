@@ -6,21 +6,24 @@ from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, Labeled
 from telegram.ext import ContextTypes
 
 from . import start_tg_bot
-from backend.models import User, Subscription, Tariff
+from backend.models import User, Subscription, Tariff, Request
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     try:
-        user = await User.objects.aget(telegram_id=update.message.from_user.id)
+        user = await User.objects.aget(telegram_id=update.effective_user.id)
         subscription = await user.subscriptions.select_related('tariff').afirst()
+
         reply_text = textwrap.dedent(f'''
                 Здравствуйте, {user.name}.\n
                 Ваша подписка: {subscription.tariff.title}.
                 Осталось запросов: {subscription.tariff.max_month_requests - subscription.sent_requests}.
                 Максимальное время ответа на запрос: {subscription.tariff.max_response_time}ч.
-                Подписка продлится: {31 - (subscription.created_at - localtime()).days}д.
+                Подписка продлится: {31 - (localtime() - subscription.created_at).days}д.
                 ''')
-        reply_keyboard = [['Сделать запрос'], ['Мои запросы']]
+
+        reply_keyboard = [['Сделать новый запрос'], ['Мои запросы']]
+
         await update.effective_chat.send_message(
             reply_text,
             reply_markup=ReplyKeyboardMarkup(
@@ -76,21 +79,41 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     tg_user = update.message.from_user
-    tariff = await Tariff.objects.aget(id=context.user_data["tariff_id"])
     user = await User.objects.acreate(
         telegram_id=tg_user.id,
         name=tg_user.first_name,
         type="employer",
     )
-    subscription = await Subscription.objects.acreate(user=user, tariff=tariff)
+    subscription = await Subscription.objects.acreate(user=user, tariff=context.user_data['tariff'])
     await update.message.reply_text(
         f"Спасибо за покупку! {user.name}, теперь вам доступны возможности подписки {subscription.tariff.title}."
     )
     return await start(update, context)
 
 
-def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def handle_make_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    if update.callback_query:
+        await update.callback_query.message.delete()
+        return await start(update, context)
+    else:
+        user = await User.objects.aget(telegram_id=update.message.from_user.id)
+        await Request.objects.acreate(customer=user, description=update.message.text)
+        tariff = context.user_data["tariff"]
+        await update.message.reply_text(
+            f"Ваша заявка была создана, она будет рассмотрена в течении {tariff.max_response_time}ч. Ожидайте."
+        )
+        return await start(update, context)
+
+
+async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     if update.message.text == "Сделать новый запрос":
-        pass
+        await update.message.reply_text(
+            f"Для того чтобы сделать новый запрос, просто напишите текстовую информацию о нём боту, одним сообщением.",
+            reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("Назад", callback_data="back")]
+                ])
+            )
+
+        return start_tg_bot.HANDLE_MAKE_REQUEST
     elif update.message.text == "Мои запросы":
         pass
