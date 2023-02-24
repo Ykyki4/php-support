@@ -41,6 +41,17 @@ class Worker(User):
 
 
 class Subscription(models.Model):
+    CREATED = 'CREATED'
+    ASSIGNED = 'ASSIGNED'
+    IN_PROGRESS = 'IN_PROGRESS'
+    DONE = 'DONE'
+    STATUSES = [
+        (CREATED, 'Создан'),
+        (ASSIGNED, 'Назначен исполнитель'),
+        (IN_PROGRESS, 'В работе'),
+        (DONE, 'Готов'),
+    ]
+
     user = models.ForeignKey(
         Customer,
         on_delete=models.CASCADE,
@@ -59,6 +70,12 @@ class Subscription(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создано')
     updated_at = models.DateTimeField(auto_now=True, verbose_name='Обновлено')
+    status = models.CharField(
+        max_length=50,
+        verbose_name='Статус заказа',
+        choices=STATUSES,
+        default=CREATED,
+    )
 
     def has_max_requests(self):
         return self.sent_requests == self.tariff.max_month_requests
