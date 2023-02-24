@@ -25,7 +25,7 @@ class User(models.Model):
         verbose_name_plural = 'Пользователи'
 
     def __str__(self):
-        return f"{self.name} - {self.get_type_display()}"
+        return f"{self.name}"
 
 
 class Customer(User):
