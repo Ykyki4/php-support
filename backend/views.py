@@ -1,3 +1,6 @@
+from asgiref.sync import sync_to_async
+from django.db import transaction
+
 from .models import Customer, Worker, Request, Tariff, Subscription
 
 
@@ -26,10 +29,11 @@ def serialize_user(user):
     }
 
 
+@sync_to_async
 def get_customer_subscription(telegram_id):
-    user = Customer.objects.get(telegram_id=telegram_id)
-
-    if user is None:
+    try:
+        user = Customer.objects.get(telegram_id=telegram_id)
+    except Customer.DoesNotExist:
         return None
 
     subscription = user.subscriptions.first()
@@ -47,10 +51,11 @@ def get_customer_subscription(telegram_id):
     }
 
 
+@sync_to_async
 def get_customer_requests(telegram_id):
-    user = Customer.objects.get(telegram_id=telegram_id)
-
-    if user is None:
+    try:
+        user = Customer.objects.get(telegram_id=telegram_id)
+    except Customer.DoesNotExist:
         return None
 
     requests = user.requests.all()
@@ -61,10 +66,11 @@ def get_customer_requests(telegram_id):
     ]
 
 
+@sync_to_async
 def get_worker_requests(telegram_id):
-    user = Worker.objects.get(telegram_id=telegram_id)
-
-    if user is None:
+    try:
+        user = Worker.objects.get(telegram_id=telegram_id)
+    except Worker.DoesNotExist:
         return None
 
     requests = user.requests.all()
@@ -75,17 +81,22 @@ def get_worker_requests(telegram_id):
     ]
 
 
+@sync_to_async
 def get_user_info(telegram_id):
-    worker = Worker.objects.get(telegram_id=telegram_id)
-    customer = Customer.objects.get(telegram_id=telegram_id)
-
-    if customer:
-        return serialize_user(customer)
-
-    if worker:
+    try:
+        worker = Worker.objects.get(telegram_id=telegram_id)
         return serialize_user(worker)
+    except Worker.DoesNotExist:
+        pass
+
+    try:
+        customer = Customer.objects.get(telegram_id=telegram_id)
+        return serialize_user(customer)
+    except Customer.DoesNotExist:
+        pass
 
 
+@sync_to_async
 def get_tariffs():
     return [
         {
@@ -100,17 +111,30 @@ def get_tariffs():
     ]
 
 
+@transaction.atomic()
+@sync_to_async
 def create_request(data):
     try:
-        Request.objects.create(customer=data['customer'], description=data['description'])
+        customer = Customer.objects.get(telegram_id=data['customer'])
+        subscription = customer.subscriptions.first()
+        if subscription.has_max_requests():
+            return False
+
+        subscription.sent_requests += 1
+        subscription.save()
+        Request.objects.create(customer=customer, description=data['description'])
         return True
-    except:
+    except Exception as err:
+        print(err)
         return False
 
 
+@sync_to_async
 def subscribe(data):
     try:
-        Subscription.objects.create(user=data['user'], tariff=data['tariff'])
+        customer = Customer.objects.get(telegram_id=data['customer'])
+        Subscription.objects.create(user=customer, tariff_id=data['tariff'])
         return True
-    except:
+    except Exception as err:
+        print(err)
         return False
