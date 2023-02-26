@@ -29,6 +29,17 @@ def serialize_user(user):
     }
 
 
+def serialize_tariff(tariff):
+    return {
+            'id': tariff.id,
+            'title': tariff.title,
+            'price': tariff.price,
+            'max_month_requests': tariff.max_month_requests,
+            'max_response_time': tariff.max_response_time,
+            'extra': tariff.extra,
+        }
+
+
 @sync_to_async
 def get_customer_subscription(telegram_id):
     try:
@@ -100,14 +111,7 @@ def get_user_info(telegram_id):
 @sync_to_async
 def get_tariffs():
     return [
-        {
-            'id': tariff.id,
-            'title': tariff.title,
-            'price': tariff.price,
-            'max_month_requests': tariff.max_month_requests,
-            'max_response_time': tariff.max_response_time,
-            'extra': tariff.extra,
-        }
+        serialize_tariff(tariff)
         for tariff in Tariff.objects.all()
     ]
 
@@ -131,11 +135,28 @@ def create_request(telegram_id, description):
 
 
 @sync_to_async
-def subscribe(data):
+def create_user(telegram_id, name):
     try:
-        customer = Customer.objects.get(telegram_id=data['customer'])
-        Subscription.objects.create(user=customer, tariff_id=data['tariff'])
+        Customer.objects.create(telegram_id=telegram_id, name=name)
         return True
     except Exception as err:
         print(err)
         return False
+
+
+@sync_to_async
+def subscribe(telegram_id, tariff_id):
+    try:
+        customer = Customer.objects.get(telegram_id=telegram_id)
+        Subscription.objects.create(user=customer, tariff_id=tariff_id)
+        return True
+    except Exception as err:
+        print(err)
+        return False
+
+
+@sync_to_async
+def get_tariff(tariff_id):
+    tariff = Tariff.objects.get(id=tariff_id)
+    return serialize_tariff(tariff)
+
