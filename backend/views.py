@@ -16,6 +16,7 @@ def serialize_request(request):
             'telegram_id': request.customer.telegram_id,
             'name': request.customer.name
         },
+        'title': request,
         'description': request.description,
         'status': request.get_status_display(),
     }
@@ -159,4 +160,12 @@ def subscribe(telegram_id, tariff_id):
 def get_tariff(tariff_id):
     tariff = Tariff.objects.get(id=tariff_id)
     return serialize_tariff(tariff)
+
+
+@sync_to_async
+def get_all_requests():
+    return [
+        serialize_request(request)
+        for request in Request.objects.filter(status='CREATED')
+    ]
 
