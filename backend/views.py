@@ -47,7 +47,8 @@ def get_customer_subscription(telegram_id):
             'max_response_time': subscription.tariff.max_response_time,
             'extra': subscription.tariff.extra,
         },
-        'created_at': subscription.created_at
+        'created_at': subscription.created_at,
+        'has_max_requests': subscription.has_max_requests()
     }
 
 
@@ -111,18 +112,18 @@ def get_tariffs():
     ]
 
 
-@transaction.atomic()
 @sync_to_async
-def create_request(data):
+@transaction.atomic()
+def create_request(telegram_id, description):
     try:
-        customer = Customer.objects.get(telegram_id=data['customer'])
+        customer = Customer.objects.get(telegram_id=telegram_id)
         subscription = customer.subscriptions.first()
         if subscription.has_max_requests():
             return False
 
         subscription.sent_requests += 1
         subscription.save()
-        Request.objects.create(customer=customer, description=data['description'])
+        Request.objects.create(customer=customer, description=description)
         return True
     except Exception as err:
         print(err)
