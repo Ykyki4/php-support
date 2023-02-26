@@ -15,6 +15,7 @@ from telegram.ext import (
 
 from . import handle_freelancer, handle_employer
 from backend.models import Subscription, Tariff
+from ...views import get_tariff
 
 USER_TYPE, HANDLE_USER_NOT_FOUND, WAIT_PAYMENT, HANDLE_EMPLOYER_MENU, \
     HANDLE_MAKE_REQUEST, HANDLE_SHOW_ALL_EMPLOYER_REQUESTS = range(6)
@@ -48,19 +49,20 @@ async def handle_user_not_found(update: Update, context: ContextTypes.DEFAULT_TY
         await update.callback_query.message.delete()
         return await start(update, context)
     else:
-        tariff = await Tariff.objects.aget(id=update.callback_query.data)
-        context.user_data['tariff'] = tariff
+        tariff_id = update.callback_query.data
+        context.user_data['tariff_id'] = tariff_id
+        tariff = await get_tariff(tariff_id)
 
-        description = f"Покупка подписки {tariff.title} на месяц."
+        description = f"Покупка подписки {tariff['title']} на месяц."
 
         payload = "Subscription-Payload"
 
         currency = "RUB"
 
-        prices = [LabeledPrice("Test", tariff.price * 100)]
+        prices = [LabeledPrice("Test", tariff['price'] * 100)]
 
         await update.effective_chat.send_invoice(
-            tariff.title, description, payload, settings.TG_PAYMENT_PROVIDER_TOKEN, currency, prices
+            tariff['title'], description, payload, settings.TG_PAYMENT_PROVIDER_TOKEN, currency, prices
         )
 
         return WAIT_PAYMENT

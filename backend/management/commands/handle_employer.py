@@ -1,30 +1,30 @@
 import textwrap
 
-from asgiref.sync import sync_to_async
 from django.utils.timezone import localtime
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton, LabeledPrice, ReplyKeyboardMarkup
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 from . import start_tg_bot
-from backend.models import Subscription, Tariff, Request, Customer
+from backend.views import get_customer_subscription, get_tariffs, create_request, get_customer_requests, \
+        create_user, subscribe
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    try:
-        user = await Customer.objects.aget(telegram_id=update.effective_user.id)
-        subscription = await user.subscriptions.select_related('tariff').afirst()
+    subscription = await get_customer_subscription(update.effective_user.id)
+    if subscription:
+        context.user_data['subscription'] = subscription
 
         reply_text = textwrap.dedent(f'''
-                Здравствуйте, {user.name}.\n
-                Ваша подписка: {subscription.tariff.title}.
-                Осталось запросов: {subscription.tariff.max_month_requests - subscription.sent_requests}.
-                Максимальное время ответа на запрос: {subscription.tariff.max_response_time}ч.
-                Подписка продлится: {31 - (localtime() - subscription.created_at).days}д.
+                Здравствуйте, {update.effective_user.first_name}.\n
+                Ваша подписка: {subscription['tariff']['title']}.
+                Осталось запросов: {subscription['tariff']['max_month_requests'] - subscription['sent_requests']}.
+                Максимальное время ответа на запрос: {subscription['tariff']['max_response_time']}ч.
+                Подписка продлится: {31 - (localtime() - subscription['created_at']).days}д.
                 ''')
 
         reply_keyboard = [[InlineKeyboardButton('Мои запросы', callback_data="all_requests")]]
 
-        if subscription.has_max_requests():
+        if subscription['has_max_requests']:
             reply_text += "Извините, вы достигли максимального количества заявок в месяц по вашей подписке."
         else:
             reply_keyboard.append([InlineKeyboardButton('Сделать новый запрос', callback_data="new_request")])
@@ -37,8 +37,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         )
 
         return start_tg_bot.HANDLE_EMPLOYER_MENU
-
-    except Customer.DoesNotExist:
+    else:
         reply_text = textwrap.dedent('''
         Извините, но мы не смогли найти вас у себя.\n\n
         Чтобы стать заказчиком, вам нужно оформить подписку.
@@ -47,17 +46,17 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
         reply_markup = []
 
-        async for tariff in Tariff.objects.all():
+        for tariff in await get_tariffs():
             reply_text += textwrap.dedent(f'''
-            {tariff.title} - {tariff.price}₽ в месяц \n
-            Максимум заявок в месяц: {tariff.max_month_requests}
-            Максимальное время рассмотра заявки: {tariff.max_response_time}ч.\n
+            {tariff['title']} - {tariff['price']}₽ в месяц \n
+            Максимум заявок в месяц: {tariff['max_month_requests']}
+            Максимальное время рассмотра заявки: {tariff['max_response_time']}ч.\n
             ''')
-            if tariff.extra:
-                reply_text += f"Дополнительно: {tariff.extra}\n\n"
+            if tariff['extra']:
+                reply_text += f"Дополнительно: {tariff['extra']}\n\n"
 
             reply_markup.append(
-                [InlineKeyboardButton(tariff.title, callback_data=tariff.id)]
+                [InlineKeyboardButton(tariff['title'], callback_data=tariff['id'])]
             )
 
         reply_markup.append(
@@ -81,16 +80,21 @@ async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 async def successful_payment_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    tg_user = update.message.from_user
-    user = await Customer.objects.acreate(
-        telegram_id=tg_user.id,
-        name=tg_user.first_name,
-    )
-    subscription = await Subscription.objects.acreate(user=user, tariff=context.user_data['tariff'])
-    await update.message.reply_text(
-        f"Спасибо за покупку! {user.name}, теперь вам доступны возможности подписки {subscription.tariff.title}."
-    )
-    return await start(update, context)
+    tariff_id = context.user_data['tariff_id']
+    tg_user = update.effective_user
+
+    await create_user(tg_user.id, tg_user.first_name)
+    created = await subscribe(tg_user.id, tariff_id)
+    if created:
+        await update.message.reply_text(
+            f"Спасибо за покупку!"
+        )
+        return await start(update, context)
+    else:
+        await update.message.reply_text(
+            f"Извините, произошла непредвиденная ошибка. Попробуйте снова."
+        )
+        return await start_tg_bot.start(update, context)
 
 
 async def handle_make_request(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -98,18 +102,21 @@ async def handle_make_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.callback_query.message.delete()
         return await start(update, context)
     else:
-        user = await Customer.objects.aget(telegram_id=update.message.from_user.id)
-        subscription = await user.subscriptions.select_related('tariff').afirst()
+        created = await create_request(update.effective_user.id, update.message.text)
 
-        await Request.objects.acreate(customer=user, description=update.message.text)
-
-        subscription.sent_requests += 1
-        await sync_to_async(subscription.save)()
-
-        await update.message.reply_text(
-            f"Ваша заявка была создана, она будет рассмотрена в течении {subscription.tariff.max_response_time}ч. Ожидайте."
-        )
-        return await start(update, context)
+        if created:
+            subscription = context.user_data['subscription']
+            await update.effective_chat.send_message(
+                "Ваша заявка была создана, она будет рассмотрена в течении"
+                f" {subscription['tariff']['max_response_time']}ч. Ожидайте."
+            )
+            return await start(update, context)
+        else:
+            await update.effective_chat.send_message(
+                "Извините, произошла непредвиденная ошибка, или вы достигли максимального количества запросов."
+                "Попробуйте снова позже."
+            )
+            return await start(update, context)
 
 
 async def handle_show_all_requests(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -119,7 +126,6 @@ async def handle_show_all_requests(update: Update, context: ContextTypes.DEFAULT
 
 
 async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    print(update.callback_query.data)
     if update.callback_query.data == 'new_request':
         await update.callback_query.message.delete()
         await update.effective_chat.send_message(
@@ -134,12 +140,10 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     elif update.callback_query.data == 'all_requests':
         reply_text = "Ваши запросы:\n"
 
-        user = await Customer.objects.aget(telegram_id=update.effective_user.id)
-        async for request in user.requests.all():
+        for request in await get_customer_requests(update.effective_user.id):
             reply_text += textwrap.dedent(f'''
-            {request}
-            Описание запрос: {request.description}
-            Статус запроса: Статус
+            Описание запроса: {request['description']}
+            Статус запроса: {request['status']}
             ''')
 
         await update.callback_query.message.delete()
