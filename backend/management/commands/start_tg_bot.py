@@ -14,11 +14,11 @@ from telegram.ext import (
 )
 
 from . import handle_freelancer, handle_employer
-from backend.models import Subscription, Tariff
-from ...views import get_tariff
+from backend.views import get_tariff
 
 USER_TYPE, HANDLE_USER_NOT_FOUND, WAIT_PAYMENT, HANDLE_EMPLOYER_MENU, \
-    HANDLE_MAKE_REQUEST, HANDLE_SHOW_ALL_EMPLOYER_REQUESTS = range(6)
+    HANDLE_MAKE_REQUEST, HANDLE_SHOW_EMPLOYER_REQUESTS, HANDLE_FREELANCER_MENU, HANDLE_FREELANCER_ALL_REQUESTS, \
+    HANDLE_FREELANCER_MY_REQUESTS, HANDLE_FREELANCER_WRITE_EMPLOYER, HANDLE_EMPLOYER_WRITE_FREELANCER = range(11)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -36,12 +36,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def user_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user = update.message.from_user
-
     if update.message.text == "Заказчик":
         return await handle_employer.start(update, context)
     elif update.message.text == "Фрилансер":
-        return await handle_freelancer.start(update, context, user)
+        return await handle_freelancer.start(update, context)
 
 
 async def handle_user_not_found(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -107,8 +105,25 @@ class Command(BaseCommand):
                     CallbackQueryHandler(handle_employer.handle_make_request),
                     MessageHandler(filters.TEXT, handle_employer.handle_make_request),
                 ],
-                HANDLE_SHOW_ALL_EMPLOYER_REQUESTS: [
+                HANDLE_SHOW_EMPLOYER_REQUESTS: [
                     CallbackQueryHandler(handle_employer.handle_show_all_requests)
+                ],
+                HANDLE_FREELANCER_MENU: [
+                    CallbackQueryHandler(handle_freelancer.handle_menu),
+                ],
+                HANDLE_FREELANCER_ALL_REQUESTS: [
+                    CallbackQueryHandler(handle_freelancer.handle_freelancer_all_requests)
+                ],
+                HANDLE_FREELANCER_MY_REQUESTS: [
+                    CallbackQueryHandler(handle_freelancer.handle_freelancer_my_requests)
+                ],
+                HANDLE_FREELANCER_WRITE_EMPLOYER: [
+                    CallbackQueryHandler(handle_freelancer.handle_write_employer),
+                    MessageHandler(filters.TEXT, handle_freelancer.handle_write_employer)
+                ],
+                HANDLE_EMPLOYER_WRITE_FREELANCER: [
+                    CallbackQueryHandler(handle_employer.handle_write_freelancer),
+                    MessageHandler(filters.TEXT, handle_employer.handle_write_freelancer)
                 ]
             },
             fallbacks=[CommandHandler("cancel", cancel)],

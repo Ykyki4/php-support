@@ -1,12 +1,13 @@
 import textwrap
 
 from django.utils.timezone import localtime
+from more_itertools import chunked
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 
 from . import start_tg_bot
 from backend.views import get_customer_subscription, get_tariffs, create_request, get_customer_requests, \
-        create_user, subscribe
+    create_user, subscribe, get_request
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -119,10 +120,95 @@ async def handle_make_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             return await start(update, context)
 
 
-async def handle_show_all_requests(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if update.callback_query.data == "back":
+async def get_requests_keyboard(requests, chunk):
+    chunk_size = 2
+    chunked_requests = list(chunked(requests, chunk_size))
+    reply_keyboard = [[InlineKeyboardButton(f"Написать исполнителю: '{request['title']}'",
+                                            callback_data=request['id'])]
+                      for request in chunked_requests[int(chunk)]
+                      if request['status'] == 'Назначен исполнитель']
+
+    arrows_keyboard = []
+    arrows_keyboard.append(InlineKeyboardButton('⬅️', callback_data='⬅️')) \
+        if chunk != 0 else None
+    arrows_keyboard.append(InlineKeyboardButton('➡️', callback_data='➡️')) \
+        if chunk + 1 != len(chunked_requests) else None
+
+    reply_keyboard.append(arrows_keyboard)
+
+    reply_keyboard.append([InlineKeyboardButton('Назад', callback_data='back')])
+
+    return reply_keyboard
+
+
+async def get_requests_text(requests, chunk):
+    chunk_size = 2
+    reply_text = 'Ваши запросы:\n'
+
+    for request in list(chunked(requests, chunk_size))[int(chunk)]:
+        reply_text += textwrap.dedent(f'''
+            {request['title']}
+            Описание: {request['description']}
+            Статус: {request['status']}
+        ''')
+
+    return reply_text
+
+
+async def handle_write_freelancer(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.callback_query:
         await update.callback_query.message.delete()
         return await start(update, context)
+    else:
+        request_id = context.user_data['current_request_id']
+        request = await get_request(request_id)
+        text = textwrap.dedent(f'''
+            Вам сообщение от заказчика взятого вами закзаа: {request['title']}\n
+            Описание запроса: {request['description']}\n
+            Сообщение заказчика: {update.message.text}
+        ''')
+        await context.bot.send_message(
+            request['worker']['telegram_id'],
+            text
+        )
+        await update.effective_user.send_message(
+            'Сообщение успешно отправлено.'
+        )
+        return await start(update, context)
+
+
+async def handle_show_all_requests(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    if query.data == '➡️':
+        context.user_data['current_chunk'] += 1
+    elif query.data == '⬅️':
+        context.user_data['current_chunk'] -= 1
+    elif query.data == "back":
+        await update.callback_query.message.delete()
+        return await start(update, context)
+    elif query.data:
+        context.user_data['current_request_id'] = query.data
+        await update.callback_query.message.delete()
+        await update.effective_chat.send_message(
+            'Напишите боту сообщение, которое хотите отправить исполнителю.',
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton('Назад', callback_data='back')]]
+            )
+        )
+        return start_tg_bot.HANDLE_EMPLOYER_WRITE_FREELANCER
+
+    await query.message.delete()
+    requests = await get_customer_requests(update.effective_user.id)
+    reply_keyboard = await get_requests_keyboard(requests, context.user_data['current_chunk'])
+
+    reply_text = await get_requests_text(requests, context.user_data['current_chunk'])
+
+    await update.effective_chat.send_message(
+        reply_text,
+        reply_markup=InlineKeyboardMarkup(reply_keyboard),
+    )
+
+    return start_tg_bot.HANDLE_SHOW_EMPLOYER_REQUESTS
 
 
 async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -131,27 +217,24 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         await update.effective_chat.send_message(
             f"Для того чтобы сделать новый запрос, просто напишите текстовую информацию о нём боту, одним сообщением.",
             reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("Назад", callback_data="back")]
-                ])
-            )
+                [InlineKeyboardButton("Назад", callback_data="back")]
+            ])
+        )
 
         return start_tg_bot.HANDLE_MAKE_REQUEST
 
     elif update.callback_query.data == 'all_requests':
-        reply_text = "Ваши запросы:\n"
+        context.user_data['current_chunk'] = 0
+        requests = await get_customer_requests(update.effective_user.id)
 
-        for request in await get_customer_requests(update.effective_user.id):
-            reply_text += textwrap.dedent(f'''
-            Описание запроса: {request['description']}
-            Статус запроса: {request['status']}
-            ''')
+        reply_keyboard = await get_requests_keyboard(requests, context.user_data['current_chunk'])
+
+        reply_text = await get_requests_text(requests, context.user_data['current_chunk'])
 
         await update.callback_query.message.delete()
         await update.effective_chat.send_message(
             reply_text,
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Назад", callback_data="back")]
-            ])
+            reply_markup=InlineKeyboardMarkup(reply_keyboard),
         )
-        return start_tg_bot.HANDLE_SHOW_ALL_EMPLOYER_REQUESTS
 
+        return start_tg_bot.HANDLE_SHOW_EMPLOYER_REQUESTS

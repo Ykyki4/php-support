@@ -2,3 +2,4 @@ asgiref==3.6.0
 Django==4.1.7
 environs==9.5.0
 python-telegram-bot==20.1
+more_itertools==9.0.0
