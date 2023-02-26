@@ -72,7 +72,7 @@ def get_customer_requests(telegram_id):
     except Customer.DoesNotExist:
         return None
 
-    requests = user.requests.all()
+    requests = user.requests.all().exclude(status='DONE')
 
     return [
         serialize_request(request)
@@ -87,7 +87,7 @@ def get_worker_requests(telegram_id):
     except Worker.DoesNotExist:
         return None
 
-    requests = user.requests.all()
+    requests = user.requests.all().exclude(status='DONE')
 
     return [
         serialize_request(request)
@@ -171,3 +171,29 @@ def get_all_requests():
     ]
 
 
+@sync_to_async
+def assign_worker_to_request(telegram_id, request_id):
+    try:
+        worker = Worker.objects.get(telegram_id=telegram_id)
+        request = Request.objects.get(id=request_id)
+
+        request.worker = worker
+        request.type = 'ASSIGNED'
+        request.save()
+        return True
+    except Exception as err:
+        print(err)
+        return False
+
+
+@sync_to_async
+def finish_request(request_id):
+    try:
+        request = Request.objects.get(id=request_id)
+        request.status = 'DONE'
+        request.save()
+        return True
+    except Exception as err:
+        print(err)
+        return False
+    
