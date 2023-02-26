@@ -17,7 +17,7 @@ def serialize_request(request):
             'name': request.customer.name
         },
         'description': request.description,
-        'status': dict(Request.STATUSES).get(request.status),
+        'status': request.get_status_display(),
     }
 
 
