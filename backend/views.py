@@ -16,7 +16,8 @@ def serialize_request(request):
             'telegram_id': request.customer.telegram_id,
             'name': request.customer.name
         },
-        'title': request,
+        'id': request.id,
+        'title': str(request),
         'description': request.description,
         'status': request.get_status_display(),
     }
@@ -168,4 +169,5 @@ def get_all_requests():
         serialize_request(request)
         for request in Request.objects.filter(status='CREATED')
     ]
+
 
