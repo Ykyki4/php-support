@@ -178,7 +178,7 @@ def assign_worker_to_request(telegram_id, request_id):
         request = Request.objects.get(id=request_id)
 
         request.worker = worker
-        request.type = 'ASSIGNED'
+        request.status = 'ASSIGNED'
         request.save()
         return True
     except Exception as err:
@@ -196,4 +196,9 @@ def finish_request(request_id):
     except Exception as err:
         print(err)
         return False
-    
+
+
+@sync_to_async
+def get_request(request_id):
+    request = Request.objects.get(id=request_id)
+    return serialize_request(request)
