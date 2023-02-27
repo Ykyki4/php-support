@@ -125,18 +125,21 @@ async def get_requests_keyboard(requests, context):
     chunked_requests = list(chunked(requests, chunk_size))
     current_chunk = context.user_data['current_chunk']
 
-    reply_keyboard = [[InlineKeyboardButton(f"Написать исполнителю: '{request['title']}'",
-                                            callback_data=request['id'])]
-                      for request in chunked_requests[int(current_chunk)]
-                      if request['status'] == 'Назначен исполнитель']
+    reply_keyboard = []
 
-    arrows_keyboard = []
-    arrows_keyboard.append(InlineKeyboardButton('⬅️', callback_data='⬅️')) \
-        if current_chunk != 0 else None
-    arrows_keyboard.append(InlineKeyboardButton('➡️', callback_data='➡️')) \
-        if current_chunk + 1 != len(chunked_requests) else None
+    if len(list(chunked(requests, chunk_size))) != 0:
+        reply_keyboard = [[InlineKeyboardButton(f"Написать исполнителю: '{request['title']}'",
+                                                callback_data=request['id'])]
+                          for request in chunked_requests[int(current_chunk)]
+                          if request['status'] == 'Назначен исполнитель']
 
-    reply_keyboard.append(arrows_keyboard)
+        arrows_keyboard = []
+        arrows_keyboard.append(InlineKeyboardButton('⬅️', callback_data='⬅️')) \
+            if current_chunk != 0 else None
+        arrows_keyboard.append(InlineKeyboardButton('➡️', callback_data='➡️')) \
+            if current_chunk + 1 != len(chunked_requests) else None
+
+        reply_keyboard.append(arrows_keyboard)
 
     reply_keyboard.append([InlineKeyboardButton('Назад', callback_data='back')])
 
@@ -145,19 +148,22 @@ async def get_requests_keyboard(requests, context):
 
 async def get_requests_text(requests, context):
     chunk_size = 2
-    reply_text = 'Ваши запросы:\n'
     current_chunk = context.user_data['current_chunk']
     subscription = context.user_data['subscription']
 
-    for request in list(chunked(requests, chunk_size))[int(current_chunk)]:
-        reply_text += textwrap.dedent(f'''
-            {request['title']}
-            Описание: {request['description']}
-            Статус: {request['status']}
-        ''')
-        if request['worker'] and subscription['tariff']['title'] == "VIP👑":
-            reply_text += f'Контакты исполнителя: {request["worker"]["telegram_username"]}\n'
+    if len(list(chunked(requests, chunk_size))) != 0:
+        reply_text = 'Ваши запросы:\n'
 
+        for request in list(chunked(requests, chunk_size))[int(current_chunk)]:
+            reply_text += textwrap.dedent(f'''
+                {request['title']}
+                Описание: {request['description']}
+                Статус: {request['status']}
+            ''')
+            if request['worker'] and subscription['tariff']['title'] == "VIP👑":
+                reply_text += f'Контакты исполнителя: {request["worker"]["telegram_username"]}\n'
+    else:
+        reply_text = "У вас пока нет запросов."
     return reply_text
 
 

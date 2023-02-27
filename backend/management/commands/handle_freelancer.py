@@ -37,16 +37,20 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def get_requests_keyboard(requests, chunk):
     chunk_size = 5
     chunked_requests = list(chunked(requests, chunk_size))
-    reply_keyboard = [[InlineKeyboardButton(request['title'], callback_data=request['id'])]
-                      for request in chunked_requests[int(chunk)]]
 
-    arrows_keyboard = []
-    arrows_keyboard.append(InlineKeyboardButton('⬅️', callback_data='⬅️')) \
-        if chunk != 0 else None
-    arrows_keyboard.append(InlineKeyboardButton('➡️', callback_data='➡️')) \
-        if chunk+1 != len(chunked_requests) else None
+    reply_keyboard = []
 
-    reply_keyboard.append(arrows_keyboard)
+    if len(list(chunked(requests, chunk_size))) != 0:
+        reply_keyboard = [[InlineKeyboardButton(request['title'], callback_data=request['id'])]
+                          for request in chunked_requests[int(chunk)]]
+
+        arrows_keyboard = []
+        arrows_keyboard.append(InlineKeyboardButton('⬅️', callback_data='⬅️')) \
+            if chunk != 0 else None
+        arrows_keyboard.append(InlineKeyboardButton('➡️', callback_data='➡️')) \
+            if chunk+1 != len(chunked_requests) else None
+
+        reply_keyboard.append(arrows_keyboard)
 
     reply_keyboard.append([InlineKeyboardButton('Назад', callback_data='back')])
 
@@ -55,13 +59,16 @@ async def get_requests_keyboard(requests, chunk):
 
 async def get_requests_text(requests, chunk):
     chunk_size = 5
-    reply_text = 'Доступные запросы:\n'
+    if len(list(chunked(requests, chunk_size))) != 0:
+        reply_text = 'Доступные запросы:\n'
 
-    for request in list(chunked(requests, chunk_size))[int(chunk)]:
-        reply_text += textwrap.dedent(f'''
-            {request['title']}
-            Описание: {request['description']}
-        ''')
+        for request in list(chunked(requests, chunk_size))[int(chunk)]:
+            reply_text += textwrap.dedent(f'''
+                {request['title']}
+                Описание: {request['description']}
+            ''')
+    else:
+        reply_text = 'Доступных запросов пока нет.'
 
     return reply_text
 
@@ -104,22 +111,35 @@ async def handle_freelancer_all_requests(update: Update, context: ContextTypes.D
     return start_tg_bot.HANDLE_FREELANCER_ALL_REQUESTS
 
 
-async def get_my_requests_keyboard(requests, current_request):
+async def get_my_requests_keyboard(requests, current_request_index):
     reply_keyboard = [
         [InlineKeyboardButton('Написать заказчику', callback_data='write_employer')],
         [InlineKeyboardButton('Сдать запрос', callback_data='finish_request')],
-    ]
+    ] if requests[current_request_index]['status'] != 'Готов' else []
 
     arrows_keyboard = []
     arrows_keyboard.append(InlineKeyboardButton('⬅️', callback_data='⬅️')) \
-        if current_request != 0 else None
+        if current_request_index != 0 else None
     arrows_keyboard.append(InlineKeyboardButton('➡️', callback_data='➡️')) \
-        if current_request + 1 != len(requests) else None
+        if current_request_index + 1 != len(requests) else None
 
     reply_keyboard.append(arrows_keyboard)
+
     reply_keyboard.append([InlineKeyboardButton('Назад', callback_data='back')])
 
     return reply_keyboard
+
+
+async def get_my_requests_text(requests, current_request_index):
+    current_request = requests[current_request_index]
+    reply_text = textwrap.dedent(f'''
+        Ваши запросы:\n
+        {current_request['title']}
+        Описание: {current_request['description']}
+        Статус: {current_request['status']}
+    ''')
+
+    return reply_text
 
 
 async def handle_freelancer_my_requests(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -154,13 +174,8 @@ async def handle_freelancer_my_requests(update: Update, context: ContextTypes.DE
 
     requests = await get_worker_requests(update.effective_user.id)
     current_request_index = context.user_data['current_request_index']
-    context.user_data['current_request_id'] = requests[current_request_index]['id']
 
-    reply_text = textwrap.dedent(f'''
-                Ваши запросы:\n
-                {requests[current_request_index]['title']}
-                Описание: {requests[current_request_index]['description']}
-            ''')
+    reply_text = await get_my_requests_text(requests, current_request_index)
 
     reply_keyboard = await get_my_requests_keyboard(requests, current_request_index)
 
@@ -214,22 +229,14 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         requests = await get_worker_requests(update.effective_user.id)
         current_request_index = 0
         context.user_data['current_request_index'] = current_request_index
-        context.user_data['current_request_id'] = requests[current_request_index]['id']
+        if len(requests) != 0:
+            context.user_data['current_request_id'] = requests[current_request_index]['id']
+            reply_text = await get_my_requests_text(requests, current_request_index)
 
-        reply_text = textwrap.dedent(f'''
-            Ваши запросы:\n
-            {requests[current_request_index]['title']}
-            Описание: {requests[current_request_index]['description']}
-        ''')
-
-        reply_keyboard = [
-            [InlineKeyboardButton('Написать заказчику', callback_data='write_employer')],
-            [InlineKeyboardButton('Сдать запрос', callback_data='finish_request')],
-        ]
-
-        reply_keyboard.append([InlineKeyboardButton('➡️', callback_data='➡️')])\
-            if current_request_index+1 != len(requests) else None
-        reply_keyboard.append([InlineKeyboardButton('Назад', callback_data='back')])
+            reply_keyboard = await get_my_requests_keyboard(requests, current_request_index)
+        else:
+            reply_text = 'Пока вы не взяли ни одного запроса.'
+            reply_keyboard = [[InlineKeyboardButton('Назад', callback_data='back')]]
 
         await update.callback_query.message.delete()
         await update.effective_chat.send_message(
