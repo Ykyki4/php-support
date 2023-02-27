@@ -84,7 +84,7 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
     tariff_id = context.user_data['tariff_id']
     tg_user = update.effective_user
 
-    await create_user(tg_user.id, tg_user.first_name)
+    await create_user(tg_user.id, tg_user.first_name, tg_user.name)
     created = await subscribe(tg_user.id, tariff_id)
     if created:
         await update.message.reply_text(
@@ -120,19 +120,21 @@ async def handle_make_request(update: Update, context: ContextTypes.DEFAULT_TYPE
             return await start(update, context)
 
 
-async def get_requests_keyboard(requests, chunk):
+async def get_requests_keyboard(requests, context):
     chunk_size = 2
     chunked_requests = list(chunked(requests, chunk_size))
+    current_chunk = context.user_data['current_chunk']
+
     reply_keyboard = [[InlineKeyboardButton(f"Написать исполнителю: '{request['title']}'",
                                             callback_data=request['id'])]
-                      for request in chunked_requests[int(chunk)]
+                      for request in chunked_requests[int(current_chunk)]
                       if request['status'] == 'Назначен исполнитель']
 
     arrows_keyboard = []
     arrows_keyboard.append(InlineKeyboardButton('⬅️', callback_data='⬅️')) \
-        if chunk != 0 else None
+        if current_chunk != 0 else None
     arrows_keyboard.append(InlineKeyboardButton('➡️', callback_data='➡️')) \
-        if chunk + 1 != len(chunked_requests) else None
+        if current_chunk + 1 != len(chunked_requests) else None
 
     reply_keyboard.append(arrows_keyboard)
 
@@ -141,16 +143,20 @@ async def get_requests_keyboard(requests, chunk):
     return reply_keyboard
 
 
-async def get_requests_text(requests, chunk):
+async def get_requests_text(requests, context):
     chunk_size = 2
     reply_text = 'Ваши запросы:\n'
+    current_chunk = context.user_data['current_chunk']
+    subscription = context.user_data['subscription']
 
-    for request in list(chunked(requests, chunk_size))[int(chunk)]:
+    for request in list(chunked(requests, chunk_size))[int(current_chunk)]:
         reply_text += textwrap.dedent(f'''
             {request['title']}
             Описание: {request['description']}
             Статус: {request['status']}
         ''')
+        if request['worker'] and subscription['tariff']['title'] == "VIP👑":
+            reply_text += f'Контакты исполнителя: {request["worker"]["telegram_username"]}\n'
 
     return reply_text
 
@@ -199,9 +205,9 @@ async def handle_show_all_requests(update: Update, context: ContextTypes.DEFAULT
 
     await query.message.delete()
     requests = await get_customer_requests(update.effective_user.id)
-    reply_keyboard = await get_requests_keyboard(requests, context.user_data['current_chunk'])
+    reply_keyboard = await get_requests_keyboard(requests, context)
 
-    reply_text = await get_requests_text(requests, context.user_data['current_chunk'])
+    reply_text = await get_requests_text(requests, context)
 
     await update.effective_chat.send_message(
         reply_text,
@@ -227,9 +233,9 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
         context.user_data['current_chunk'] = 0
         requests = await get_customer_requests(update.effective_user.id)
 
-        reply_keyboard = await get_requests_keyboard(requests, context.user_data['current_chunk'])
+        reply_keyboard = await get_requests_keyboard(requests, context)
 
-        reply_text = await get_requests_text(requests, context.user_data['current_chunk'])
+        reply_text = await get_requests_text(requests, context)
 
         await update.callback_query.message.delete()
         await update.effective_chat.send_message(
