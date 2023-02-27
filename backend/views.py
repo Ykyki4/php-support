@@ -66,7 +66,7 @@ def get_customer_requests(telegram_id):
     except Customer.DoesNotExist:
         return None
 
-    requests = user.requests.all().exclude(status='DONE')
+    requests = user.requests.all()
 
     return [
         serialize_request(request)
@@ -81,7 +81,7 @@ def get_worker_requests(telegram_id):
     except Worker.DoesNotExist:
         return None
 
-    requests = user.requests.all().exclude(status='DONE')
+    requests = user.requests.all()
 
     return [
         serialize_request(request)
