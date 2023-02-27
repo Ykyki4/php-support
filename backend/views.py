@@ -6,16 +6,9 @@ from .models import Customer, Worker, Request, Tariff, Subscription
 
 def serialize_request(request):
     return {
-        'worker': {
-            'id': request.worker.id,
-            'telegram_id': request.worker.telegram_id,
-            'name': request.worker.name,
-        } if request.worker else None,
-        'customer': {
-            'id': request.customer.id,
-            'telegram_id': request.customer.telegram_id,
-            'name': request.customer.name
-        },
+        'worker': serialize_user(request.worker)
+        if request.worker else None,
+        'customer': serialize_user(request.customer),
         'id': request.id,
         'title': str(request),
         'description': request.description,
@@ -27,6 +20,7 @@ def serialize_user(user):
     return {
         'id': user.id,
         'telegram_id': user.telegram_id,
+        'telegram_username': user.telegram_username,
         'name': user.name,
     }
 
@@ -137,9 +131,9 @@ def create_request(telegram_id, description):
 
 
 @sync_to_async
-def create_user(telegram_id, name):
+def create_user(telegram_id, name, telegram_username):
     try:
-        Customer.objects.create(telegram_id=telegram_id, name=name)
+        Customer.objects.create(telegram_id=telegram_id, name=name, telegram_username=telegram_username)
         return True
     except Exception as err:
         print(err)

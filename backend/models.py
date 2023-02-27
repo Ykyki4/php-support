@@ -19,6 +19,7 @@ class Tariff(models.Model):
 class User(models.Model):
     telegram_id = models.CharField('Телеграм идентификатор', unique=True, max_length=50)
     name = models.CharField('Имя', max_length=50, null=True)
+    telegram_username = models.CharField('Логин исполнителя в телеграме', max_length=50)
 
     class Meta:
         verbose_name = 'Пользователь'
