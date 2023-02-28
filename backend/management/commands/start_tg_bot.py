@@ -2,8 +2,7 @@ import logging
 
 from django.conf import settings
 from django.core.management import BaseCommand
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, InlineKeyboardMarkup, InlineKeyboardButton, \
-    LabeledPrice
+from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update, LabeledPrice
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -22,13 +21,13 @@ USER_TYPE, HANDLE_USER_NOT_FOUND, WAIT_PAYMENT, HANDLE_EMPLOYER_MENU, \
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    reply_keyboard = [["Заказчик", "Фрилансер"]]
+    reply_keyboard = [['Заказчик', 'Фрилансер']]
 
     await update.effective_chat.send_message(
-        "Здравствуй! Я бот PHPSupport, связывающий заказчиков с фрилансерами.\n\n"
-        "Вы заказчик или фрилансер?",
+        'Здравствуй! Я бот PHPSupport, связывающий заказчиков с фрилансерами.\n\n'
+        'Вы заказчик или фрилансер?',
         reply_markup=ReplyKeyboardMarkup(
-            reply_keyboard, one_time_keyboard=True, input_field_placeholder="Заказчик или фрилансер?"
+            reply_keyboard, one_time_keyboard=True, input_field_placeholder='Заказчик или фрилансер?'
         ),
     )
 
@@ -36,9 +35,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 async def user_type(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    if update.message.text == "Заказчик":
+    if update.message.text == 'Заказчик':
         return await handle_employer.start(update, context)
-    elif update.message.text == "Фрилансер":
+    elif update.message.text == 'Фрилансер':
         return await handle_freelancer.start(update, context)
 
 
@@ -51,13 +50,13 @@ async def handle_user_not_found(update: Update, context: ContextTypes.DEFAULT_TY
         context.user_data['tariff_id'] = tariff_id
         tariff = await get_tariff(tariff_id)
 
-        description = f"Покупка подписки {tariff['title']} на месяц."
+        description = f'Покупка подписки {tariff["title"]} на месяц.'
 
-        payload = "Subscription-Payload"
+        payload = 'Subscription-Payload'
 
-        currency = "RUB"
+        currency = 'RUB'
 
-        prices = [LabeledPrice("Test", tariff['price'] * 100)]
+        prices = [LabeledPrice('Test', tariff['price'] * 100)]
 
         await update.effective_chat.send_invoice(
             tariff['title'], description, payload, settings.TG_PAYMENT_PROVIDER_TOKEN, currency, prices
@@ -68,27 +67,27 @@ async def handle_user_not_found(update: Update, context: ContextTypes.DEFAULT_TY
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     await update.message.reply_text(
-        "Пока-пока!", reply_markup=ReplyKeyboardRemove()
+        'Пока-пока!', reply_markup=ReplyKeyboardRemove()
     )
 
     return ConversationHandler.END
 
 
 class Command(BaseCommand):
-    help = "Start telegram bot"
+    help = 'Start telegram bot'
 
     def handle(self, *args, **options):
         logging.basicConfig(
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
         )
 
         application = Application.builder().token(settings.TG_BOT_TOKEN).build()
 
         conv_handler = ConversationHandler(
-            entry_points=[CommandHandler("start", start)],
+            entry_points=[CommandHandler('start', start)],
             states={
                 USER_TYPE: [
-                    MessageHandler(filters.Regex("^(Заказчик|Фрилансер)$"), user_type)
+                    MessageHandler(filters.Regex('^(Заказчик|Фрилансер)$'), user_type)
                 ],
                 HANDLE_USER_NOT_FOUND: [
                     CallbackQueryHandler(handle_user_not_found),
@@ -126,10 +125,11 @@ class Command(BaseCommand):
                     MessageHandler(filters.TEXT, handle_employer.handle_write_freelancer)
                 ]
             },
-            fallbacks=[CommandHandler("cancel", cancel)],
+            fallbacks=[CommandHandler('cancel', cancel)],
             per_chat=False,
         )
 
         application.add_handler(conv_handler)
 
         application.run_polling()
+        

@@ -1,6 +1,6 @@
 import textwrap
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 from more_itertools import chunked
 
@@ -25,10 +25,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return start_tg_bot.HANDLE_FREELANCER_MENU
     else:
         await update.effective_chat.send_message(
-            "Извините, но мы не можем найти вас у себя.\n\n"
-            "Обратитесь к нашему администратору, если хотите стать фрилансером: https://t.me/PacmuClaB",
+            'Извините, но мы не можем найти вас у себя.\n\n'
+            'Обратитесь к нашему администратору, если хотите стать фрилансером: https://t.me/PacmuClaB',
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Назад", callback_data="back")],
+                [InlineKeyboardButton('Назад', callback_data='back')],
             ])
         )
         return start_tg_bot.HANDLE_USER_NOT_FOUND

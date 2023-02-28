@@ -23,12 +23,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
                 Подписка продлится: {31 - (localtime() - subscription['created_at']).days}д.
                 ''')
 
-        reply_keyboard = [[InlineKeyboardButton('Мои запросы', callback_data="all_requests")]]
+        reply_keyboard = [[InlineKeyboardButton('Мои запросы', callback_data='all_requests')]]
 
         if subscription['has_max_requests']:
-            reply_text += "Извините, вы достигли максимального количества заявок в месяц по вашей подписке."
+            reply_text += 'Извините, вы достигли максимального количества заявок в месяц по вашей подписке.'
         else:
-            reply_keyboard.append([InlineKeyboardButton('Сделать новый запрос', callback_data="new_request")])
+            reply_keyboard.append([InlineKeyboardButton('Сделать новый запрос', callback_data='new_request')])
 
         await update.effective_chat.send_message(
             reply_text,
@@ -49,19 +49,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
         for tariff in await get_tariffs():
             reply_text += textwrap.dedent(f'''
-            {tariff['title']} - {tariff['price']}₽ в месяц \n
-            Максимум заявок в месяц: {tariff['max_month_requests']}
-            Максимальное время рассмотра заявки: {tariff['max_response_time']}ч.\n
+            {tariff["title"]} - {tariff["price"]}₽ в месяц \n
+            Максимум заявок в месяц: {tariff["max_month_requests"]}
+            Максимальное время рассмотра заявки: {tariff["max_response_time"]}ч.\n
             ''')
             if tariff['extra']:
-                reply_text += f"Дополнительно: {tariff['extra']}\n\n"
+                reply_text += f'Дополнительно: {tariff["extra"]}\n\n'
 
             reply_markup.append(
                 [InlineKeyboardButton(tariff['title'], callback_data=tariff['id'])]
             )
 
         reply_markup.append(
-            [InlineKeyboardButton("Назад🔙", callback_data="back")],
+            [InlineKeyboardButton('Назад🔙', callback_data='back')],
         )
 
         await update.message.reply_text(
@@ -74,8 +74,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def precheckout_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.pre_checkout_query
 
-    if query.invoice_payload != "Subscription-Payload":
-        await query.answer(ok=False, error_message="Something went wrong...")
+    if query.invoice_payload != 'Subscription-Payload':
+        await query.answer(ok=False, error_message='Something went wrong...')
     else:
         await query.answer(ok=True)
 
@@ -88,12 +88,12 @@ async def successful_payment_callback(update: Update, context: ContextTypes.DEFA
     created = await subscribe(tg_user.id, tariff_id)
     if created:
         await update.message.reply_text(
-            f"Спасибо за покупку!"
+            f'Спасибо за покупку!'
         )
         return await start(update, context)
     else:
         await update.message.reply_text(
-            f"Извините, произошла непредвиденная ошибка. Попробуйте снова."
+            f'Извините, произошла непредвиденная ошибка. Попробуйте снова.'
         )
         return await start_tg_bot.start(update, context)
 
@@ -108,14 +108,14 @@ async def handle_make_request(update: Update, context: ContextTypes.DEFAULT_TYPE
         if created:
             subscription = context.user_data['subscription']
             await update.effective_chat.send_message(
-                "Ваша заявка была создана, она будет рассмотрена в течении"
-                f" {subscription['tariff']['max_response_time']}ч. Ожидайте."
+                'Ваша заявка была создана, она будет рассмотрена в течении'
+                f' {subscription["tariff"]["max_response_time"]}ч. Ожидайте.'
             )
             return await start(update, context)
         else:
             await update.effective_chat.send_message(
-                "Извините, произошла непредвиденная ошибка, или вы достигли максимального количества запросов."
-                "Попробуйте снова позже."
+                'Извините, произошла непредвиденная ошибка, или вы достигли максимального количества запросов.'
+                'Попробуйте снова позже.'
             )
             return await start(update, context)
 
@@ -128,7 +128,7 @@ async def get_requests_keyboard(requests, context):
     reply_keyboard = []
 
     if len(list(chunked(requests, chunk_size))) != 0:
-        reply_keyboard = [[InlineKeyboardButton(f"Написать исполнителю: '{request['title']}'",
+        reply_keyboard = [[InlineKeyboardButton(f'Написать исполнителю: "{request["title"]}"',
                                                 callback_data=request['id'])]
                           for request in chunked_requests[int(current_chunk)]
                           if request['status'] == 'Назначен исполнитель']
@@ -160,10 +160,10 @@ async def get_requests_text(requests, context):
                 Описание: {request['description']}
                 Статус: {request['status']}
             ''')
-            if request['worker'] and subscription['tariff']['title'] == "VIP👑":
+            if request['worker'] and subscription['tariff']['title'] == 'VIP👑':
                 reply_text += f'Контакты исполнителя: {request["worker"]["telegram_username"]}\n'
     else:
-        reply_text = "У вас пока нет запросов."
+        reply_text = 'У вас пока нет запросов.'
     return reply_text
 
 
@@ -195,7 +195,7 @@ async def handle_show_all_requests(update: Update, context: ContextTypes.DEFAULT
         context.user_data['current_chunk'] += 1
     elif query.data == '⬅️':
         context.user_data['current_chunk'] -= 1
-    elif query.data == "back":
+    elif query.data == 'back':
         await update.callback_query.message.delete()
         return await start(update, context)
     elif query.data:
@@ -227,9 +227,9 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int
     if update.callback_query.data == 'new_request':
         await update.callback_query.message.delete()
         await update.effective_chat.send_message(
-            f"Для того чтобы сделать новый запрос, просто напишите текстовую информацию о нём боту, одним сообщением.",
+            f'Для того чтобы сделать новый запрос, просто напишите текстовую информацию о нём боту, одним сообщением.',
             reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("Назад", callback_data="back")]
+                [InlineKeyboardButton('Назад', callback_data='back')]
             ])
         )
 
